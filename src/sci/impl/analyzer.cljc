@@ -11,17 +11,8 @@
    [sci.impl.utils :as utils :refer
     [eval? gensym* mark-resolve-sym mark-eval mark-eval-call constant?
      rethrow-with-location-of-node throw-error-with-location
-     merge-meta kw-identical? strip-core-ns set-namespace!]]))
-
-;; derived from (keys (. clojure.lang.Compiler specials))
-;; (& monitor-exit case* try reify* finally loop* do letfn* if clojure.core/import* new deftype* let* fn* recur set! . var quote catch throw monitor-enter def)
-(def special-syms '#{try finally do if new recur quote catch throw def . var set!})
-
-;; Built-in macros.
-(def macros '#{do if when and or -> ->> as-> quote quote* let fn fn* def defn
-               comment loop lazy-seq for doseq require cond case try defmacro
-               declare expand-dot* expand-constructor new . import in-ns ns var
-               set!})
+     merge-meta kw-identical? strip-core-ns set-namespace!
+     fully-qualify special-syms macros]]))
 
 (defn check-permission! [{:keys [:allow :deny]} check-sym sym]
   (when-not (kw-identical? :allow (-> sym meta :row))
@@ -591,7 +582,8 @@
                                    (cond (constant? v) v
                                          (:sci/macro (meta v))
                                          (throw (new #?(:clj IllegalStateException :cljs js/Error)
-                                                     (str "Can't take value of a macro: " expr "")))
+                                                     (str "Can't take value of a macro: "
+                                                          (fully-qualify @(:env ctx) expr) "")))
                                          (fn? v) (merge-meta v {:sci.impl/eval false})
                                          (vars/var? v) (with-meta v (assoc (meta v) :sci.impl/eval true))
                                          :else (merge-meta v (meta expr))))

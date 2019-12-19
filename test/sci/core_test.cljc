@@ -630,7 +630,7 @@
   (is (= 11 (eval* "(letfn [(f [x] (g x)) (g [x] (inc x))] (f 10))"))))
 
 (deftest cant-take-value-of-macro-test
-  (are [x] (thrown-with-msg? #?(:clj Exception :cljs js/Error) #"value of a macro"
+  (are [x] (thrown-with-msg? #?(:clj Exception :cljs js/Error) (re-pattern (str "value of a macro.*clojure\\.core/" x))
                              (eval* x))
     "letfn"
     "dotimes"))

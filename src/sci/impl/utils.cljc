@@ -121,3 +121,35 @@
                  (let [ns-var (get-in env [:namespaces 'clojure.core '*ns*])]
                    (vars/bindRoot ns-var (sci.impl.vars.SciNamespace. ns-sym))
                    (assoc env :current-ns ns-sym))))))
+
+;; derived from (keys (. clojure.lang.Compiler specials))
+;; (& monitor-exit case* try reify* finally loop* do letfn* if clojure.core/import* new deftype* let* fn* recur set! . var quote catch throw monitor-enter def)
+(def special-syms '#{try finally do if new recur quote catch throw def . var set!})
+
+;; Built-in macros.
+(def macros '#{do if when and or -> ->> as-> quote quote* let fn fn* def defn
+               comment loop lazy-seq for doseq require cond case try defmacro
+               declare expand-dot* expand-constructor new . import in-ns ns var
+               set!})
+
+(defn fully-qualify [env sym]
+  (let [sym-ns (when-let [n (namespace sym)]
+                 (symbol n))
+        sym-name-str (name sym)
+        current-ns (:current-ns env)
+        current-ns-str (str current-ns)
+        namespaces (get env :namespaces)
+        the-current-ns (get namespaces current-ns)
+        aliases (:aliases the-current-ns)
+        ret (if-not sym-ns
+              (let [clojure-core (get namespaces 'clojure.core)]
+                (if (or (get clojure-core sym)
+                        (contains? macros sym))
+                  (symbol "clojure.core" sym-name-str)
+                  (symbol current-ns-str sym-name-str)))
+              (if (get-in env [:namespaces sym-ns])
+                sym
+                (if-let [ns (get aliases sym-ns)]
+                  (symbol (str ns) sym-name-str)
+                  sym)))]
+    ret))
