@@ -1,7 +1,7 @@
 (ns sci.core-test
   (:require
    [clojure.string :as str]
-   [clojure.test :as test :refer [deftest is testing]]
+   [clojure.test :as test :refer [deftest is are testing]]
    [sci.core :as sci :refer [eval-string]]
    [sci.test-utils :as tu]))
 
@@ -628,6 +628,12 @@
   (is (= 2 (eval* "(letfn [(f ([x] (f x 1)) ([x y] (+ x y)))] (f 1))")))
   (is (= 3 (eval* "(letfn [(f ([x] (f x 1)) ([x y] (+ x y)))] (f 1 2))")))
   (is (= 11 (eval* "(letfn [(f [x] (g x)) (g [x] (inc x))] (f 10))"))))
+
+(deftest cant-take-value-of-macro-test
+  (are [x] (thrown-with-msg? #?(:clj Exception :cljs js/Error) #"value of a macro"
+                             (eval* x))
+    "letfn"
+    "dotimes"))
 
 ;;;; Scratch
 

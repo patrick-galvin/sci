@@ -587,7 +587,11 @@
   [ctx expr]
   (let [ret (cond (constant? expr) expr ;; constants do not carry metadata
                   (symbol? expr) (let [v (resolve-symbol ctx expr)]
+                                   ;; (prn (meta v))
                                    (cond (constant? v) v
+                                         (:sci/macro (meta v))
+                                         (throw (new #?(:clj IllegalStateException :cljs js/Error)
+                                                     (str "Can't take value of a macro: " expr "")))
                                          (fn? v) (merge-meta v {:sci.impl/eval false})
                                          (vars/var? v) (with-meta v (assoc (meta v) :sci.impl/eval true))
                                          :else (merge-meta v (meta expr))))
