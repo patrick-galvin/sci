@@ -61,6 +61,8 @@
            (when-let [c (interop/resolve-class ctx sym)]
              [sym c]))))))
 
+(declare analyze)
+
 (defn lookup [{:keys [:bindings] :as ctx} sym]
   (let [[k v :as kv]
         (or
@@ -82,7 +84,9 @@
       (if (:sci/deref! m)
         ;; the evaluation of this expression has been delayed by
         ;; the caller and now is the time to deref it
-        [k @v] kv)
+        [k (if (vars/var? v)
+             @@v
+             @v)] kv)
       kv)))
 
 (defn resolve-symbol
@@ -112,8 +116,6 @@
                           sym)))))]
      ;; (prn 'resolve sym '-> res (meta res))
      res)))
-
-(declare analyze)
 
 (defn analyze-children [ctx children]
   (mapv #(analyze ctx %) children))
