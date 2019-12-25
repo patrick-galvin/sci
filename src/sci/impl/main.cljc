@@ -2,7 +2,7 @@
   "Only used for testing"
   {:no-doc true}
   (:require [sci.core :as sci :refer [eval-string]]
-            #?(:clj [sci.addons :as addons])
+            #?(:clj [sci.addons.future :as future-addon])
             #?(:clj [clojure.edn :as edn]
                :cljs [cljs.reader :as edn]))
   #?(:clj (:gen-class)))
@@ -13,6 +13,6 @@
             (eval-string
              form
              (-> (edn/read-string ctx)
-                 #?(:clj (addons/future)))))]
+                 #?(:clj (future-addon/future)))))]
     (when (some? v) (prn v)))
   #?(:clj (shutdown-agents)))
