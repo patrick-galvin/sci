@@ -221,18 +221,18 @@ Hello Michiel!
 ## Futures
 
 Creating threads with `future` and `pmap` is disabled by default, but can be
-enabled by requiring `sci.addons` and applying the `sci.addons/future` function
+enabled by requiring `sci.addons.future` and applying the `future` function
 to the sci options:
 
 ``` clojure
 (ns my.sci.app
   (:require
    [sci.core :as sci]
-   [sci.addons :as addons]))
+   [sci.addons.future :as future-addon]))
 
 (sci/eval-string "@(future (inc x))"
                  (-> {:bindings {'x 1}}
-                     (addons/future)))
+                     (future-addon/future)))
 ;;=> 2
 ```
 

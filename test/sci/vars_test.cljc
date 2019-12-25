@@ -3,7 +3,7 @@
    [clojure.test :as test :refer [deftest is testing]]
    [sci.test-utils :as tu]
    [sci.core :as sci]
-   [sci.addons :as addons]))
+   #?(:clj [sci.addons.future :as future])))
 
 (defn eval*
   ([form] (eval* nil form))
@@ -90,11 +90,11 @@
    (when-not tu/native?
      (deftest binding-conveyor-test
        (is (= 1 (tu/eval* "(def ^:dynamic x 0) (binding [x 1] @(future x))"
-                          (addons/future {}))))
+                          (future/future {}))))
        (is (= 13 (tu/eval* "(def ^:dynamic x 10)
                               (binding [x (inc x)]
                                 @(future (binding [x (inc x)] @(future (binding [x (inc x)] x)))))"
-                           (addons/future {})))))))
+                           (future/future {})))))))
 
 (deftest with-bindings-api-test
   (when-not tu/native?
@@ -126,7 +126,7 @@
      (when-not tu/native?
        (is (= '(11 11 11)
               (tu/eval* "(def ^:dynamic x 10) (binding [x 11] (pmap #(+ x %) [0 0 0]))"
-                        (addons/future {})))))))
+                        (future/future {})))))))
 
 (def ^:dynamic *x* 10)
 
