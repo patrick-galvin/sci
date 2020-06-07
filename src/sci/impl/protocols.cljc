@@ -2,7 +2,8 @@
   {:no-doc true}
   (:refer-clojure :exclude [defprotocol extend extend-protocol
                             -reset-methods -cache-protocol-fn
-                            find-protocol-method find-protocol-impl])
+                            find-protocol-method find-protocol-impl
+                            missing-protocol])
   (:require [sci.impl.vars :as vars]))
 
 (defn- protocol-prefix [psym]
@@ -45,7 +46,6 @@
         (bar-me [this y] x))))
   => 17"
   [_ _ ctx psym & doc+methods]
-  (prn (type ctx) psym)
   (let [p psym ;; TODO (:name (cljs.analyzer/resolve-var (dissoc &env :locals) psym))
         [opts methods]
         (loop [opts {:protocol-symbol true}
@@ -97,11 +97,11 @@
                            ;; construct protocol checks in reverse order
                            ;; check the.protocol/fn["_"] for default impl last
                            check
-                           `(let [m# (unchecked-get ~fqn-fname "_")]
+                           `(let [m# (get ~fqn-fname "_")]
                               (if-not (nil? m#)
                                 (m# ~@sig)
                                 (throw
-                                 (missing-protocol
+                                 (clojure.core/missing-protocol
                                   ~(str psym "." fname) ~fsig))))
 
                            ;; then check protocol fn in metadata (only when protocol is marked with :extend-via-metadata true)
@@ -115,7 +115,7 @@
                            ;; then check protocol on js string,function,array,object (first dynamic check actually executed)
                            check
                            `(let [x# (if (nil? ~fsig) nil ~fsig)
-                                  m# (unchecked-get ~fqn-fname (goog/typeOf x#))]
+                                  m# (get ~fqn-fname (type x#))]
                               (if-not (nil? m#)
                                 (m# ~@sig)
                                 ~check))]
@@ -153,43 +153,94 @@
                                      (let [doc (as-> (last sigs) doc
                                                  (when (string? doc) doc))
                                            sigs (take-while vector? sigs)]
-                                       [(keyword fname) {:name fname :arglists (list* sigs) :doc doc}]))
+                                       [(keyword fname) {:name fname
+                                                         :arglists (list* sigs) :doc doc}]))
                                    methods))))
         method (fn [[fname & sigs]]
                  (let [doc (as-> (last sigs) doc
                              (when (string? doc) doc))
                        sigs (take-while vector? sigs)
                        amp nil #_::TODO #_(when (some #{'&} (apply concat sigs))
-                             (cljs.analyzer/warning
-                              :protocol-with-variadic-method
-                              &env {:protocol psym :name fname}))
+                                            (cljs.analyzer/warning
+                                             :protocol-with-variadic-method
+                                             &env {:protocol psym :name fname}))
                        _ nil #_(when-some [existing (get (-> &env :ns :defs) fname)]
-                           (when-not (= p (:protocol existing))
-                             (cljs.analyzer/warning
-                              :protocol-with-overwriting-method
-                              {} {:protocol psym :name fname :existing existing})))
+                                 (when-not (= p (:protocol existing))
+                                   (cljs.analyzer/warning
+                                    :protocol-with-overwriting-method
+                                    {} {:protocol psym :name fname :existing existing})))
                        slot (symbol (str prefix (munge (name fname))))
                        dyn-name (symbol (str slot "$dyn"))
                        fname (vary-meta fname assoc
                                         :protocol p
                                         :doc doc)]
-                   `(let [~dyn-name (fn
-                                      ~@(map (fn [sig]
-                                               (expand-dyn fname sig))
-                                             sigs))]
-                      (defn ~fname
-                        ~@(map (fn [sig]
-                                 (expand-sig dyn-name
-                                             (with-meta (symbol (str slot "$arity$" (count sig)))
-                                               {:protocol-prop true})
-                                             sig))
-                               sigs)))))]
+                   `(do
+                      (declare ~fname)
+                      (let [~dyn-name (fn
+                                        ~@(map (fn [sig]
+                                                 (expand-dyn fname sig))
+                                               sigs))]
+                        (defn ~fname
+                          ~@(map (fn [sig]
+                                   (expand-sig dyn-name
+                                               (with-meta (symbol (str slot "$arity$" (count sig)))
+                                                 {:protocol-prop true})
+                                               sig))
+                                 sigs))))))
+        bare-psym (with-meta psym nil)]
     `(do
-       (def ~psym {})
+       (def ~bare-psym {})
+       ;; workaround for preventing eval of metadata of psym above, since it contains quoted data
+       (alter-meta! (var ~bare-psym) (constantly (quote ~(meta psym))))
        ~@(map method methods)
        )))
 
+(defn missing-protocol [a b]
+  (ex-info (str "missing protocol " a "." b) {:a a :b b}))
+
+
+(defn extend
+  "Implementations of protocol methods can be provided using the extend construct:
+  (extend AType
+    AProtocol
+     {:foo an-existing-fn
+      :bar (fn [a b] ...)
+      :baz (fn ([a]...) ([a b] ...)...)}
+    BProtocol
+      {...}
+    ...)
+
+  extend takes a type/class (or interface, see below), and one or more
+  protocol + method map pairs. It will extend the polymorphism of the
+  protocol's methods to call the supplied methods when an AType is
+  provided as the first argument.
+  Method maps are maps of the keyword-ized method names to ordinary
+  fns. This facilitates easy reuse of existing fns and fn maps, for
+  code reuse/mixins without derivation or composition. You can extend
+  an interface to a protocol. This is primarily to facilitate interop
+  with the host (e.g. Java) but opens the door to incidental multiple
+  inheritance of implementation since a class can inherit from more
+  than one interface, both of which extend the protocol. It is TBD how
+  to specify which impl to use. You can extend a protocol on nil.
+  If you are supplying the definitions explicitly (i.e. not reusing
+  exsting functions or mixin maps), you may find it more convenient to
+  use the extend-type or extend-protocol macros.
+  Note that multiple independent extend clauses can exist for the same
+  type, not all protocols need be defined in a single extend call.
+  See also:
+  extends?, satisfies?, extenders"
+  {:added "1.2"}
+  [atype & proto+mmaps]
+  (doseq [[proto mmap] (partition 2 proto+mmaps)]
+    #_(when-not (protocol? proto)
+      (throw (IllegalArgumentException.
+              (str proto " is not a protocol"))))
+    #_(when (implements? proto atype)
+      (throw (IllegalArgumentException.
+              (str atype " already directly implements " (:on-interface proto) " for protocol:"
+                   (:var proto)))))
+    #_(-reset-methods (alter-var-root (:var proto) assoc-in [:impls atype] mmap))))
+
 (def extend-protocol {})
-(def extend {})
 (def -cache-protocol-fn {})
 (def defprotocol2 {})
