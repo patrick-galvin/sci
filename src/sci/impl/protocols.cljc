@@ -114,24 +114,19 @@
 
                            ;; then check protocol on js string,function,array,object (first dynamic check actually executed)
                            check
-                           `(let [x# (if (nil? ~fsig) nil ~fsig)
-                                  m# (get ~fqn-fname (type x#))]
-                              (if-not (nil? m#)
-                                (m# ~@sig)
-                                ~check))]
+                           ;; TODO: here check if there is an implementation for this type
+                           (do (prn fqn-fname `(get ~fqn-fname (type x#)))
+                               `(let [_ (prn ~fqn-fname)
+                                      x# (if (nil? ~fsig) nil ~fsig)
+                                      m# (get (meta ~fqn-fname) (type x#))]
+                                (if-not (nil? m#)
+                                  (m# ~@sig)
+                                  ~check)))]
                        `(~sig ~check)))
-        expand-sig (fn [dyn-name slot sig]
+        expand-sig (fn [dyn-name _slot sig]
                      (let [sig (sig->syms sig)
-
-                           fsig (first sig)
-
-                           ;; check protocol property on object (first check executed)
                            check
-                           `(if (and (not (nil? ~fsig))
-                                     ;; Property access needed here.
-                                     (not (nil? (. ~fsig ~(with-meta (symbol (str "-" slot)) {:protocol-prop true})))))
-                              (. ~fsig ~slot ~@sig)
-                              (~dyn-name ~@sig))]
+                           `(~dyn-name ~@sig)]
                        `(~sig ~check)))
         psym (-> psym
                  (vary-meta update-in [:jsdoc] conj "@interface")
