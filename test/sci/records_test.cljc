@@ -50,3 +50,16 @@
 (defrecord Rectangle [width height])
 (record? (->Rectangle 0 0))"]
     (is (true? (tu/eval* prog {})))))
+
+;; TODO:
+#_(deftest import-test
+  (let [prog "
+(ns foo)
+(defrecord Rectangle [width height])
+
+(ns bar
+  (:require [foo :refer [->Rectangle]])
+  (:import [foo.Rectangle]))
+
+(instance? Rectangle (->Rectangle 10 20 ))"]
+    (is (true? (tu/eval* prog {})))))

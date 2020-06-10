@@ -24,6 +24,11 @@
                      (let ~bindings
                        ~@(nnext impl)))))
               protocol-impls)]
+    ;; TODO:
+    #_(swap! (:env ctx) update :records (fnil conj #{})
+           (symbol (str (vars/current-ns-name)
+                        "."
+                        record-name)))
     `(do
        ;; (prn '~record-name)
        (def ~record-name (with-meta '~record-name

@@ -491,8 +491,11 @@
                              (let [p (first spec) cs (rest spec)]
                                (into v (map #(str p "." %) cs)))))
                          [] specs)]
-      (let [fq-class-name (symbol spec)]
-        (when-not (interop/resolve-class ctx fq-class-name)
+      (let [fq-class-name (symbol spec)
+            resolved-class (or (interop/resolve-class ctx fq-class-name)
+                               ;; TODO:
+                               #_(get-in env [:records fq-class-name]))]
+        (when-not resolved-class
           (throw-error-with-location (str "Unable to resolve classname: " fq-class-name) expr))
         (let [last-dot (str/last-index-of spec ".")
               class-name (subs spec (inc last-dot) (count spec))
