@@ -563,7 +563,7 @@
                     (:file m))]
          (when file
            (vars/push-thread-bindings {vars/callstack (conj @vars/callstack file)})
-           (prn @vars/callstack))
+           #_(prn @vars/callstack))
          (let [res (cond
                      (and (symbol? f) (not op))
                      (eval-special-call ctx f expr)
